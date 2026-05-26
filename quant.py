@@ -72,7 +72,7 @@ st.markdown("""
     .market-down { color: #00f2fe; font-size: 14px; font-weight: bold; margin-top: 5px; } 
     .market-flat { color: #94a3b8; font-size: 14px; font-weight: bold; margin-top: 5px; }
     
-    /* 모바일용 종목 카드 (표 대신 사용) */
+    /* 모바일용 종목 카드 */
     .stock-card {
         background: rgba(15, 23, 42, 0.5); border: 1px solid #1e293b;
         border-radius: 12px; padding: 18px; margin-bottom: 15px;
@@ -178,7 +178,59 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# [섹션 2] 글로벌 증시 & 지표 (모바일 최적화 2열 배치)
+# [섹션 1.5] CNN 공포·탐욕 지수 (Fear & Greed Index)
+# ==========================================
+def get_fear_and_greed():
+    try:
+        url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+            'Accept': 'application/json'
+        }
+        res = requests.get(url, headers=headers, timeout=5)
+        data = res.json()
+        score = int(data['fear_and_greed']['score'])
+        
+        if score < 25:
+            state = "극단적 공포 (Extreme Fear)"
+            color = "#ef4444" # 빨강
+        elif score < 45:
+            state = "공포 (Fear)"
+            color = "#f97316" # 주황
+        elif score <= 55:
+            state = "중립 (Neutral)"
+            color = "#eab308" # 노랑
+        elif score <= 75:
+            state = "탐욕 (Greed)"
+            color = "#22c55e" # 초록
+        else:
+            state = "극단적 탐욕 (Extreme Greed)"
+            color = "#14b8a6" # 청록
+            
+        return score, state, color
+    except:
+        return 50, "데이터 확인 불가", "#94a3b8"
+
+fg_score, fg_state, fg_color = get_fear_and_greed()
+
+st.markdown(f"""
+<div style="background: rgba(15, 23, 42, 0.6); border: 1px solid #374151; border-radius: 12px; padding: 20px; margin-bottom: 25px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+    <div style="color: #94a3b8; font-size: 15px; font-weight: bold; margin-bottom: 5px;">CNN 공포·탐욕 지수 (Fear & Greed Index)</div>
+    <div style="font-size: 38px; font-weight: 900; color: {fg_color}; margin-bottom: -5px;">{fg_score}</div>
+    <div style="font-size: 16px; font-weight: bold; color: {fg_color}; margin-bottom: 15px;">{fg_state}</div>
+    <div style="width: 100%; background-color: #1e293b; border-radius: 10px; height: 14px; overflow: hidden; border: 1px solid #334155;">
+        <div style="width: {fg_score}%; background-color: {fg_color}; height: 100%; border-radius: 10px; transition: width 1s ease-in-out;"></div>
+    </div>
+    <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: #64748b; font-weight: bold;">
+        <span>0 (극단적 공포)</span>
+        <span>50 (중립)</span>
+        <span>100 (극단적 탐욕)</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# [섹션 2] 글로벌 증시 & 지표 (모바일 가독성 개선 - 행 단위 묶음)
 # ==========================================
 def get_direct_realtime(ticker):
     try:
@@ -217,23 +269,30 @@ wti_p, wti_d, wti_pct, wti_c = get_direct_realtime("CL=F")
 gold_p, gold_d, gold_pct, gold_c = get_direct_realtime("GC=F")
 btc_p, btc_d, btc_pct, btc_c = get_direct_realtime("BTC-USD")
 
-# 모바일에서는 자동으로 2개씩 예쁘게 쌓이도록 컬럼 조정
+# 1행: 국내 증시
 c1, c2 = st.columns(2)
-with c1: 
-    st.markdown(make_card("KOSPI", kp_p, kp_d, kp_pct, kp_c, "https://finance.yahoo.com/quote/%5EKS11"), unsafe_allow_html=True)
-    st.markdown(make_card("S&P 500", sp_p, sp_d, sp_pct, sp_c, "https://finance.yahoo.com/quote/%5EGSPC"), unsafe_allow_html=True)
-    st.markdown(make_card("환율 (USD/KRW)", usd_p, usd_d, usd_pct, usd_c, "https://finance.yahoo.com/quote/KRW=X"), unsafe_allow_html=True)
-    st.markdown(make_card("금 (Gold)", gold_p, gold_d, gold_pct, gold_c, "https://finance.yahoo.com/quote/GC=F"), unsafe_allow_html=True)
-with c2: 
-    st.markdown(make_card("KOSDAQ", kq_p, kq_d, kq_pct, kq_c, "https://finance.yahoo.com/quote/%5EKQ11"), unsafe_allow_html=True)
-    st.markdown(make_card("NASDAQ", nd_p, nd_d, nd_pct, nd_c, "https://finance.yahoo.com/quote/%5EIXIC"), unsafe_allow_html=True)
-    st.markdown(make_card("유가 (WTI)", wti_p, wti_d, wti_pct, wti_c, "https://finance.yahoo.com/quote/CL=F"), unsafe_allow_html=True)
-    st.markdown(make_card("비트코인 (BTC)", btc_p, btc_d, btc_pct, btc_c, "https://finance.yahoo.com/quote/BTC-USD"), unsafe_allow_html=True)
+with c1: st.markdown(make_card("KOSPI", kp_p, kp_d, kp_pct, kp_c, "https://finance.yahoo.com/quote/%5EKS11"), unsafe_allow_html=True)
+with c2: st.markdown(make_card("KOSDAQ", kq_p, kq_d, kq_pct, kq_c, "https://finance.yahoo.com/quote/%5EKQ11"), unsafe_allow_html=True)
+
+# 2행: 미국 증시
+c3, c4 = st.columns(2)
+with c3: st.markdown(make_card("S&P 500", sp_p, sp_d, sp_pct, sp_c, "https://finance.yahoo.com/quote/%5EGSPC"), unsafe_allow_html=True)
+with c4: st.markdown(make_card("NASDAQ", nd_p, nd_d, nd_pct, nd_c, "https://finance.yahoo.com/quote/%5EIXIC"), unsafe_allow_html=True)
+
+# 3행: 환율 및 유가
+c5, c6 = st.columns(2)
+with c5: st.markdown(make_card("환율 (USD/KRW)", usd_p, usd_d, usd_pct, usd_c, "https://finance.yahoo.com/quote/KRW=X"), unsafe_allow_html=True)
+with c6: st.markdown(make_card("유가 (WTI)", wti_p, wti_d, wti_pct, wti_c, "https://finance.yahoo.com/quote/CL=F"), unsafe_allow_html=True)
+
+# 4행: 금 및 비트코인
+c7, c8 = st.columns(2)
+with c7: st.markdown(make_card("금 (Gold)", gold_p, gold_d, gold_pct, gold_c, "https://finance.yahoo.com/quote/GC=F"), unsafe_allow_html=True)
+with c8: st.markdown(make_card("비트코인 (BTC)", btc_p, btc_d, btc_pct, btc_c, "https://finance.yahoo.com/quote/BTC-USD"), unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ==========================================
-# [섹션 3] AI 기반 중소형 성장주 (모바일 카드형 디자인)
+# [섹션 3] AI 기반 중소형 성장주
 # ==========================================
 st.markdown("<h4 style='color: #00f2fe; margin-bottom: 5px; font-weight: 800;'>💎 오늘의 저평가 중소형 성장주</h4>", unsafe_allow_html=True)
 st.markdown("<p style='color: #94a3b8; font-size: 13px; margin-bottom: 15px;'>※ 3년 연속 영업이익 증가 & PBR 2.0 이하</p>", unsafe_allow_html=True)
@@ -315,7 +374,6 @@ with st.spinner("AI가 오늘의 성장 기업을 발굴하고 있습니다...")
     base_stock_data = get_target_stock_codes()
     final_stock_data = get_realtime_prices_direct(base_stock_data)
 
-# 모바일 최적화 카드형 UI 렌더링
 for s in final_stock_data:
     link = f"https://finance.yahoo.com/quote/{s['code']}.KS"
     pbr_styled = f"<span class='highlight-val'>{s['pbr']}</span>" if s['pbr'] != "-" and float(s['pbr']) < 1.0 else s['pbr']
