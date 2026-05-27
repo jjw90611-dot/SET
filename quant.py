@@ -8,6 +8,7 @@ import random
 import ssl
 import xml.etree.ElementTree as ET
 from email.utils import parsedate_to_datetime
+import html as html_lib  # HTML 깨짐 방지용
 
 # 보안(SSL) 차단 무시
 if hasattr(ssl, '_create_unverified_context'):
@@ -90,9 +91,10 @@ st.markdown("""
     .trend-text { font-size: 13px; color: #cbd5e1; margin-bottom: 4px; }
     .trend-val { color: #f43f5e; font-weight: bold; font-size: 14px; }
     
+    /* 공시 전광판: 높이를 키워 약 10개가 보이고 스크롤 되도록 설정 */
     .disclosure-box {
         background: rgba(15, 23, 42, 0.5); border: 1px solid #1e293b;
-        border-radius: 12px; padding: 15px; max-height: 350px; overflow-y: auto;
+        border-radius: 12px; padding: 15px; max-height: 450px; overflow-y: auto;
         box-shadow: inset 0 2px 10px rgba(0,0,0,0.5); margin-bottom: 20px;
     }
     .disclosure-item { border-bottom: 1px solid #334155; padding: 12px 0; }
@@ -231,30 +233,27 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# [섹션 2] 글로벌 증시 & 지표 (코스피/코스닥 네이버 실시간 연동)
+# [섹션 2] 글로벌 증시 & 지표 (네이버 실시간 폴링 API 적용)
 # ==========================================
-def get_naver_realtime_index(code):
-    """네이버 금융 모바일 API를 통한 코스피/코스닥 1초 단위 실시간 데이터"""
+def get_naver_polling_index(code):
+    """네이버 금융 실시간 폴링 API (가장 빠르고 정확함)"""
     try:
-        url = f"https://m.stock.naver.com/api/index/{code}/basic"
+        url = f"https://polling.finance.naver.com/api/realtime/domestic/index/{code}"
         res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
-        data = res.json()
+        data = res.json()['datas'][0]
         
-        curr_str = data.get('closePrice', '0.00')
-        diff_raw = data.get('compareToPreviousClosePrice', '0').replace(',', '')
-        pct_raw = data.get('fluctuationsRatio', '0').replace('%', '')
-        compare = data.get('compare', '3')
+        curr_str = data['closePrice']
+        diff_raw = data['compareToPreviousClosePrice']
+        pct_raw = data['fluctuationsRatio']
+        compare_code = data['compareToPreviousPrice']['code']
         
-        diff = float(diff_raw)
-        pct = float(pct_raw)
-        
-        if compare in ['1', '2']: # 상승
-            diff_str = f"▲ {diff:,.2f}"
-            pct_str = f"+{pct:.2f}%"
+        if compare_code in ['1', '2']: # 상승
+            diff_str = f"▲ {diff_raw}"
+            pct_str = f"+{pct_raw}%"
             color = "market-up"
-        elif compare in ['4', '5']: # 하락
-            diff_str = f"▼ {diff:,.2f}"
-            pct_str = f"-{pct:.2f}%"
+        elif compare_code in ['4', '5']: # 하락
+            diff_str = f"▼ {diff_raw}"
+            pct_str = f"-{pct_raw}%"
             color = "market-down"
         else: # 보합
             diff_str = "0.00"
@@ -266,7 +265,6 @@ def get_naver_realtime_index(code):
         return "0.00", "0.00", "0.00%", "market-flat"
 
 def get_yahoo_realtime(ticker):
-    """야후 파이낸스를 통한 해외 지수 실시간 데이터"""
     try:
         url = f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1m&range=1d&_={int(time.time() * 1000)}"
         headers = {'User-Agent': 'Mozilla/5.0'}
@@ -294,9 +292,9 @@ def make_card(title, price, diff, pct, color, link):
     </a>
     """
 
-# 국내 증시는 네이버 API 사용
-kp_p, kp_d, kp_pct, kp_c = get_naver_realtime_index("KOSPI")
-kq_p, kq_d, kq_pct, kq_c = get_naver_realtime_index("KOSDAQ")
+# 국내 증시는 네이버 실시간 폴링 API 사용
+kp_p, kp_d, kp_pct, kp_c = get_naver_polling_index("KOSPI")
+kq_p, kq_d, kq_pct, kq_c = get_naver_polling_index("KOSDAQ")
 
 # 해외 증시 및 지표는 야후 파이낸스 사용
 sp_p, sp_d, sp_pct, sp_c = get_yahoo_realtime("^GSPC")
@@ -325,17 +323,17 @@ with c8: st.markdown(make_card("비트코인 (BTC)", btc_p, btc_d, btc_pct, btc_
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ==========================================
-# [섹션 3] AI 기반 중소형 성장주
+# [섹션 3] AI 기반 중소형 성장주 (부채비율 200% 이하 & 유보율 정렬)
 # ==========================================
 st.markdown("<h4 style='color: #00f2fe; margin-bottom: 5px; font-weight: 800;'>💎 오늘의 저평가 중소형 성장주</h4>", unsafe_allow_html=True)
-st.markdown("<p style='color: #94a3b8; font-size: 13px; margin-bottom: 15px;'>※ 3년 연속 영업이익 증가 & PBR 2.0 이하</p>", unsafe_allow_html=True)
+st.markdown("<p style='color: #94a3b8; font-size: 13px; margin-bottom: 15px;'>※ 3년 연속 영업이익 증가 & PBR 2.0 이하 & 부채비율 200% 이하 (유보율 높은 순)</p>", unsafe_allow_html=True)
 
 @st.cache_data(ttl=86400)
 def get_target_stock_codes():
     today = datetime.date.today()
     random.seed(today.toordinal())
     candidates = []
-    for page in range(2, 6):
+    for page in range(2, 7):
         try:
             url = f"https://finance.naver.com/sise/sise_market_sum.naver?sosok=0&page={page}"
             res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
@@ -351,7 +349,7 @@ def get_target_stock_codes():
     random.shuffle(candidates)
     results = []
     for name, code in candidates:
-        if len(results) >= 3: break
+        if len(results) >= 5: break # 넉넉하게 5개까지 찾은 후 정렬
         try:
             url = f"https://finance.naver.com/item/main.naver?code={code}"
             res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
@@ -370,6 +368,15 @@ def get_target_stock_codes():
             if not table: continue
             rows = table.find('tbody').find_all('tr')
             
+            # 부채비율 200% 이하 조건 추가
+            debt_str = rows[6].find_all('td')[2].text.strip().replace(',', '')
+            if not debt_str or debt_str == '-': continue
+            if float(debt_str) > 200: continue
+            
+            # 유보율 추출 (정렬용)
+            reserve_str = rows[8].find_all('td')[2].text.strip().replace(',', '')
+            reserve_val = float(reserve_str) if reserve_str and reserve_str != '-' else 0
+            
             op_cols = rows[1].find_all('td')[:3]
             ops = [int(c.text.strip().replace(',', '')) for c in op_cols if c.text.strip() and c.text.strip() != '-']
             rev_cols = rows[0].find_all('td')[:3]
@@ -385,11 +392,14 @@ def get_target_stock_codes():
                     
                     results.append({
                         "name": name, "code": code, "price": curr_price, "pbr": str(pbr),
-                        "roe": roe, "debt": debt, "reserve": reserve,
+                        "roe": roe, "debt": debt, "reserve": reserve, "reserve_val": reserve_val,
                         "rev": rev_str, "op": op_str
                     })
         except: continue
-    return results
+        
+    # 유보율이 높은 순서대로 정렬 후 상위 3개만 반환
+    results.sort(key=lambda x: x['reserve_val'], reverse=True)
+    return results[:3]
 
 with st.spinner("AI가 오늘의 성장 기업을 발굴하고 있습니다..."):
     final_stock_data = get_target_stock_codes()
@@ -414,7 +424,7 @@ else:
                 <span class="info-label">ROE</span> <span class="info-val">{s['roe']}</span>
             </div>
             <div class="stock-info-row">
-                <span class="info-label">부채비율 / 유보율</span> <span class="info-val">{s['debt']} / {s['reserve']}</span>
+                <span class="info-label">부채비율 / 유보율</span> <span class="info-val">{s['debt']} / <span style="color:#22c55e;">{s['reserve']}</span></span>
             </div>
             <div class="stock-trend-box">
                 <div class="trend-text">📈 최근 3년 매출액 추이</div>
@@ -508,10 +518,10 @@ else:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ==========================================
-# [섹션 5] 실시간 기업 공시 전광판 (DART 연동)
+# [섹션 5] 실시간 기업 공시 전광판 (DART 연동 & 에러 완벽 해결)
 # ==========================================
 st.markdown("<h4 style='color: #00f2fe; margin-bottom: 5px; font-weight: 800;'>📢 실시간 기업 공시 (DART)</h4>", unsafe_allow_html=True)
-st.markdown("<p style='color: #94a3b8; font-size: 13px; margin-bottom: 15px;'>※ 금융감독원 전자공시시스템 실시간 연동</p>", unsafe_allow_html=True)
+st.markdown("<p style='color: #94a3b8; font-size: 13px; margin-bottom: 15px;'>※ 금융감독원 전자공시시스템 실시간 연동 (스크롤하여 확인)</p>", unsafe_allow_html=True)
 
 def get_dart_disclosures():
     try:
@@ -526,16 +536,16 @@ def get_dart_disclosures():
         if not items:
             return "<div class='disclosure-box' style='text-align:center; color:#94a3b8; padding: 20px;'>현재 업데이트된 공시가 없습니다.</div>"
             
-        for item in items[:30]:
+        for item in items[:40]: # 넉넉하게 40개 가져와서 스크롤로 쌓이게 함
             title_elem = item.find('title')
             link_elem = item.find('link')
             author_elem = item.find('author')
             pub_date_elem = item.find('pubDate')
             
-            title = title_elem.text if title_elem is not None else "제목 없음"
-            link = link_elem.text if link_elem is not None else "#"
-            author = author_elem.text if author_elem is not None else ""
-            pub_date_str = pub_date_elem.text if pub_date_elem is not None else ""
+            title = title_elem.text.strip() if title_elem is not None else "제목 없음"
+            link = link_elem.text.strip() if link_elem is not None else "#"
+            author = author_elem.text.strip() if author_elem is not None else ""
+            pub_date_str = pub_date_elem.text.strip() if pub_date_elem is not None else ""
             
             try: 
                 dt = parsedate_to_datetime(pub_date_str)
@@ -543,12 +553,15 @@ def get_dart_disclosures():
             except: 
                 date_str = "방금 전"
                 
-            display_title = f"[{author}] {title}" if author else title
+            raw_display_title = f"[{author}] {title}" if author else title
+            
+            # HTML 깨짐 방지를 위한 특수문자 이스케이프 처리 (핵심 에러 해결)
+            safe_display_title = html_lib.escape(raw_display_title)
             
             html += f"""
             <div class="disclosure-item">
                 <div class="disclosure-time">🔔 {date_str}</div>
-                <a href="{link}" target="_blank" class="disclosure-title">{display_title}</a>
+                <a href="{link}" target="_blank" class="disclosure-title">{safe_display_title}</a>
             </div>
             """
         html += "</div>"
