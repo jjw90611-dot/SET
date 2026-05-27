@@ -9,7 +9,7 @@ import ssl
 import xml.etree.ElementTree as ET
 from email.utils import parsedate_to_datetime
 
-# 보안(SSL) 차단 무시
+# 보안(SSL) 차단 무시 (공공 와이파이/사내망 에러 방지)
 if hasattr(ssl, '_create_unverified_context'):
     ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -37,7 +37,6 @@ st.markdown("""
 <style>
     .stApp { background-color: #070b14; color: #e2e8f0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     
-    /* 기본 텍스트 스타일 */
     .main-title { 
         font-size: 38px; font-weight: 900; 
         background: -webkit-linear-gradient(45deg, #00f2fe, #4facfe);
@@ -47,7 +46,6 @@ st.markdown("""
     }
     .sub-title { color: #94a3b8; font-size: 16px; margin-bottom: 20px; font-weight: 500; }
     
-    /* 브리핑 박스 */
     .briefing-box {
         background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(10px);
         border-left: 4px solid #00f2fe; border-radius: 12px; padding: 20px;
@@ -58,7 +56,6 @@ st.markdown("""
     .news-title:hover { color: #f43f5e; }
     .news-time { color: #64748b; font-size: 12px; display: block; margin-top: 4px; margin-bottom: 15px; }
     
-    /* 마켓 카드 */
     .market-card {
         background: linear-gradient(145deg, #111827, #1f2937);
         border: 1px solid #374151; border-radius: 12px; padding: 15px; 
@@ -72,7 +69,6 @@ st.markdown("""
     .market-down { color: #00f2fe; font-size: 14px; font-weight: bold; margin-top: 5px; } 
     .market-flat { color: #94a3b8; font-size: 14px; font-weight: bold; margin-top: 5px; }
     
-    /* 모바일용 종목 카드 */
     .stock-card {
         background: rgba(15, 23, 42, 0.5); border: 1px solid #1e293b;
         border-radius: 12px; padding: 18px; margin-bottom: 15px;
@@ -94,14 +90,28 @@ st.markdown("""
     .trend-text { font-size: 13px; color: #cbd5e1; margin-bottom: 4px; }
     .trend-val { color: #f43f5e; font-weight: bold; font-size: 14px; }
     
-    /* 버튼 및 기타 */
+    .disclosure-box {
+        background: rgba(15, 23, 42, 0.5); border: 1px solid #1e293b;
+        border-radius: 12px; padding: 15px; max-height: 350px; overflow-y: auto;
+        box-shadow: inset 0 2px 10px rgba(0,0,0,0.5); margin-bottom: 20px;
+    }
+    .disclosure-item { border-bottom: 1px solid #334155; padding: 12px 0; }
+    .disclosure-item:last-child { border-bottom: none; }
+    .disclosure-time { color: #00f2fe; font-size: 12px; font-weight: bold; margin-bottom: 4px; }
+    .disclosure-title { color: #e2e8f0; font-size: 14px; text-decoration: none; display: block; line-height: 1.4; }
+    .disclosure-title:hover { color: #f43f5e; }
+
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #0f172a; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
     div.stButton > button {
         background-color: #1e293b; color: #00f2fe; border: 1px solid #00f2fe; 
         border-radius: 8px; font-weight: bold; width: 100%; height: 45px;
     }
     .disclaimer { text-align: center; color: #64748b; font-size: 13px; margin-top: 40px; padding-top: 20px; border-top: 1px solid #1e293b; line-height: 1.6; }
 
-    /* 모바일 화면(768px 이하) 특별 맞춤 설정 */
     @media (max-width: 768px) {
         .main-title { font-size: 26px; }
         .sub-title { font-size: 13px; }
@@ -149,7 +159,7 @@ def get_dynamic_briefing():
         ]
         news_items = []
         for url in urls:
-            res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
+            res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
             res.encoding = 'utf-8'
             root = ET.fromstring(res.text)
             for item in root.findall('.//item')[:10]:
@@ -178,35 +188,24 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# [섹션 1.5] CNN 공포·탐욕 지수 (Fear & Greed Index)
+# [섹션 1.5] CNN 공포·탐욕 지수
 # ==========================================
 def get_fear_and_greed():
     try:
         url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
             'Accept': 'application/json'
         }
         res = requests.get(url, headers=headers, timeout=5)
         data = res.json()
         score = int(data['fear_and_greed']['score'])
         
-        if score < 25:
-            state = "극단적 공포 (Extreme Fear)"
-            color = "#ef4444" # 빨강
-        elif score < 45:
-            state = "공포 (Fear)"
-            color = "#f97316" # 주황
-        elif score <= 55:
-            state = "중립 (Neutral)"
-            color = "#eab308" # 노랑
-        elif score <= 75:
-            state = "탐욕 (Greed)"
-            color = "#22c55e" # 초록
-        else:
-            state = "극단적 탐욕 (Extreme Greed)"
-            color = "#14b8a6" # 청록
-            
+        if score < 25: state, color = "극단적 공포 (Extreme Fear)", "#ef4444"
+        elif score < 45: state, color = "공포 (Fear)", "#f97316"
+        elif score <= 55: state, color = "중립 (Neutral)", "#eab308"
+        elif score <= 75: state, color = "탐욕 (Greed)", "#22c55e"
+        else: state, color = "극단적 탐욕 (Extreme Greed)", "#14b8a6"
         return score, state, color
     except:
         return 50, "데이터 확인 불가", "#94a3b8"
@@ -214,33 +213,35 @@ def get_fear_and_greed():
 fg_score, fg_state, fg_color = get_fear_and_greed()
 
 st.markdown(f"""
-<div style="background: rgba(15, 23, 42, 0.6); border: 1px solid #374151; border-radius: 12px; padding: 20px; margin-bottom: 25px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
-    <div style="color: #94a3b8; font-size: 15px; font-weight: bold; margin-bottom: 5px;">CNN 공포·탐욕 지수 (Fear & Greed Index)</div>
-    <div style="font-size: 38px; font-weight: 900; color: {fg_color}; margin-bottom: -5px;">{fg_score}</div>
-    <div style="font-size: 16px; font-weight: bold; color: {fg_color}; margin-bottom: 15px;">{fg_state}</div>
-    <div style="width: 100%; background-color: #1e293b; border-radius: 10px; height: 14px; overflow: hidden; border: 1px solid #334155;">
-        <div style="width: {fg_score}%; background-color: {fg_color}; height: 100%; border-radius: 10px; transition: width 1s ease-in-out;"></div>
+<a href="https://edition.cnn.com/markets/fear-and-greed" target="_blank" style="text-decoration: none; display: block;">
+    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid #374151; border-radius: 12px; padding: 20px; margin-bottom: 25px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: transform 0.2s;">
+        <div style="color: #94a3b8; font-size: 15px; font-weight: bold; margin-bottom: 5px;">CNN 공포·탐욕 지수 (클릭 시 상세이동)</div>
+        <div style="font-size: 38px; font-weight: 900; color: {fg_color}; margin-bottom: -5px;">{fg_score}</div>
+        <div style="font-size: 16px; font-weight: bold; color: {fg_color}; margin-bottom: 15px;">{fg_state}</div>
+        <div style="width: 100%; background-color: #1e293b; border-radius: 10px; height: 14px; overflow: hidden; border: 1px solid #334155;">
+            <div style="width: {fg_score}%; background-color: {fg_color}; height: 100%; border-radius: 10px; transition: width 1s ease-in-out;"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: #64748b; font-weight: bold;">
+            <span>0 (극단적 공포)</span>
+            <span>50 (중립)</span>
+            <span>100 (극단적 탐욕)</span>
+        </div>
     </div>
-    <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: #64748b; font-weight: bold;">
-        <span>0 (극단적 공포)</span>
-        <span>50 (중립)</span>
-        <span>100 (극단적 탐욕)</span>
-    </div>
-</div>
+</a>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# [섹션 2] 글로벌 증시 & 지표 (모바일 가독성 개선 - 행 단위 묶음)
+# [섹션 2] 글로벌 증시 & 지표
 # ==========================================
 def get_direct_realtime(ticker):
     try:
         url = f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1m&range=1d&_={int(time.time() * 1000)}"
-        headers = {'User-Agent': 'Mozilla/5.0', 'Cache-Control': 'no-cache'}
+        headers = {'User-Agent': 'Mozilla/5.0'}
         res = requests.get(url, headers=headers, timeout=5)
         data = res.json()
         meta = data['chart']['result'][0]['meta']
-        curr = meta['regularMarketPrice']
-        prev = meta['chartPreviousClose']
+        curr = meta.get('regularMarketPrice', 0)
+        prev = meta.get('chartPreviousClose', 0)
         diff = curr - prev
         pct = (diff / prev) * 100 if prev != 0 else 0
         diff_str = f"▲ {diff:,.2f}" if diff > 0 else f"▼ {abs(diff):,.2f}" if diff < 0 else "0.00"
@@ -269,22 +270,18 @@ wti_p, wti_d, wti_pct, wti_c = get_direct_realtime("CL=F")
 gold_p, gold_d, gold_pct, gold_c = get_direct_realtime("GC=F")
 btc_p, btc_d, btc_pct, btc_c = get_direct_realtime("BTC-USD")
 
-# 1행: 국내 증시
 c1, c2 = st.columns(2)
 with c1: st.markdown(make_card("KOSPI", kp_p, kp_d, kp_pct, kp_c, "https://finance.yahoo.com/quote/%5EKS11"), unsafe_allow_html=True)
 with c2: st.markdown(make_card("KOSDAQ", kq_p, kq_d, kq_pct, kq_c, "https://finance.yahoo.com/quote/%5EKQ11"), unsafe_allow_html=True)
 
-# 2행: 미국 증시
 c3, c4 = st.columns(2)
 with c3: st.markdown(make_card("S&P 500", sp_p, sp_d, sp_pct, sp_c, "https://finance.yahoo.com/quote/%5EGSPC"), unsafe_allow_html=True)
 with c4: st.markdown(make_card("NASDAQ", nd_p, nd_d, nd_pct, nd_c, "https://finance.yahoo.com/quote/%5EIXIC"), unsafe_allow_html=True)
 
-# 3행: 환율 및 유가
 c5, c6 = st.columns(2)
 with c5: st.markdown(make_card("환율 (USD/KRW)", usd_p, usd_d, usd_pct, usd_c, "https://finance.yahoo.com/quote/KRW=X"), unsafe_allow_html=True)
 with c6: st.markdown(make_card("유가 (WTI)", wti_p, wti_d, wti_pct, wti_c, "https://finance.yahoo.com/quote/CL=F"), unsafe_allow_html=True)
 
-# 4행: 금 및 비트코인
 c7, c8 = st.columns(2)
 with c7: st.markdown(make_card("금 (Gold)", gold_p, gold_d, gold_pct, gold_c, "https://finance.yahoo.com/quote/GC=F"), unsafe_allow_html=True)
 with c8: st.markdown(make_card("비트코인 (BTC)", btc_p, btc_d, btc_pct, btc_c, "https://finance.yahoo.com/quote/BTC-USD"), unsafe_allow_html=True)
@@ -292,7 +289,7 @@ with c8: st.markdown(make_card("비트코인 (BTC)", btc_p, btc_d, btc_pct, btc_
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ==========================================
-# [섹션 3] AI 기반 중소형 성장주
+# [섹션 3] AI 기반 중소형 성장주 (속도 최적화)
 # ==========================================
 st.markdown("<h4 style='color: #00f2fe; margin-bottom: 5px; font-weight: 800;'>💎 오늘의 저평가 중소형 성장주</h4>", unsafe_allow_html=True)
 st.markdown("<p style='color: #94a3b8; font-size: 13px; margin-bottom: 15px;'>※ 3년 연속 영업이익 증가 & PBR 2.0 이하</p>", unsafe_allow_html=True)
@@ -305,7 +302,8 @@ def get_target_stock_codes():
     for page in range(2, 6):
         try:
             url = f"https://finance.naver.com/sise/sise_market_sum.naver?sosok=0&page={page}"
-            res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
+            res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+            res.encoding = 'euc-kr'
             soup = BeautifulSoup(res.text, 'html.parser')
             links = soup.select('a.tltle')
             for link in links:
@@ -317,11 +315,16 @@ def get_target_stock_codes():
     random.shuffle(candidates)
     results = []
     for name, code in candidates:
-        if len(results) >= 5: break
+        if len(results) >= 3: break
         try:
             url = f"https://finance.naver.com/item/main.naver?code={code}"
-            res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
+            res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+            res.encoding = 'euc-kr'
             soup = BeautifulSoup(res.text, 'html.parser')
+            
+            # 실시간 가격 네이버에서 바로 추출 (속도 향상)
+            price_tag = soup.select_one('.no_today .blind')
+            curr_price = price_tag.text.strip() + "원" if price_tag else "확인불가"
             
             pbr_tag = soup.find('em', id='_pbr')
             if not pbr_tag: continue
@@ -346,62 +349,167 @@ def get_target_stock_codes():
                     op_str = f"{ops[0]:,} ➔ {ops[1]:,} ➔ {ops[2]:,}억"
                     
                     results.append({
-                        "name": name, "code": code, "pbr": str(pbr),
+                        "name": name, "code": code, "price": curr_price, "pbr": str(pbr),
                         "roe": roe, "debt": debt, "reserve": reserve,
                         "rev": rev_str, "op": op_str
                     })
         except: continue
     return results
 
-def get_realtime_prices_direct(stock_data):
-    updated_data = []
-    for s in stock_data:
-        new_s = s.copy()
-        try:
-            ticker = f"{s['code']}.KS"
-            url = f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1m&range=1d&_={int(time.time() * 1000)}"
-            headers = {'User-Agent': 'Mozilla/5.0', 'Cache-Control': 'no-cache'}
-            res = requests.get(url, headers=headers, timeout=5)
-            data = res.json()
-            price = data['chart']['result'][0]['meta']['regularMarketPrice']
-            new_s['price'] = f"{int(price):,}원"
-        except:
-            new_s['price'] = "확인 불가"
-        updated_data.append(new_s)
-    return updated_data
-
 with st.spinner("AI가 오늘의 성장 기업을 발굴하고 있습니다..."):
-    base_stock_data = get_target_stock_codes()
-    final_stock_data = get_realtime_prices_direct(base_stock_data)
+    final_stock_data = get_target_stock_codes()
 
-for s in final_stock_data:
-    link = f"https://finance.yahoo.com/quote/{s['code']}.KS"
-    pbr_styled = f"<span class='highlight-val'>{s['pbr']}</span>" if s['pbr'] != "-" and float(s['pbr']) < 1.0 else s['pbr']
+if not final_stock_data:
+    st.markdown("<div class='stock-card' style='text-align:center; color:#94a3b8;'>조건에 맞는 종목을 검색 중입니다. 잠시 후 새로고침 해주세요.</div>", unsafe_allow_html=True)
+else:
+    for s in final_stock_data:
+        link = f"https://finance.naver.com/item/main.naver?code={s['code']}"
+        pbr_styled = f"<span class='highlight-val'>{s['pbr']}</span>" if s['pbr'] != "-" and float(s['pbr']) < 1.0 else s['pbr']
+        
+        card_html = f"""
+        <div class="stock-card">
+            <div class="stock-header">
+                <a href="{link}" target="_blank" class="stock-name">{s['name']}</a>
+                <span class="stock-price">{s['price']}</span>
+            </div>
+            <div class="stock-info-row">
+                <span class="info-label">PBR</span> <span class="info-val">{pbr_styled}</span>
+            </div>
+            <div class="stock-info-row">
+                <span class="info-label">ROE</span> <span class="info-val">{s['roe']}</span>
+            </div>
+            <div class="stock-info-row">
+                <span class="info-label">부채비율 / 유보율</span> <span class="info-val">{s['debt']} / {s['reserve']}</span>
+            </div>
+            <div class="stock-trend-box">
+                <div class="trend-text">📈 최근 3년 매출액 추이</div>
+                <div class="trend-val" style="color: #94a3b8; margin-bottom: 8px;">{s['rev']}</div>
+                <div class="trend-text">🔥 최근 3년 영업이익 추이</div>
+                <div class="trend-val">{s['op']}</div>
+            </div>
+        </div>
+        """
+        st.markdown(card_html, unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# ==========================================
+# [섹션 4] 저점 주식 공략 (52주 중간값 이하 & 5일선>20일선 정배열)
+# ==========================================
+st.markdown("<h4 style='color: #f43f5e; margin-bottom: 5px; font-weight: 800;'>🎯 오늘의 바닥 탈출 (저점 공략주)</h4>", unsafe_allow_html=True)
+st.markdown("<p style='color: #94a3b8; font-size: 13px; margin-bottom: 15px;'>※ 현재가가 52주 최고/최저 중간값 이하이면서, 5일선이 20일선을 돌파한 정배열 종목</p>", unsafe_allow_html=True)
+
+@st.cache_data(ttl=3600)
+def get_bottom_fishing_stocks():
+    candidates = []
+    for page in range(1, 4):
+        try:
+            url = f"https://finance.naver.com/sise/sise_market_sum.naver?sosok=0&page={page}"
+            res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+            res.encoding = 'euc-kr'
+            soup = BeautifulSoup(res.text, 'html.parser')
+            links = soup.select('a.tltle')
+            for link in links:
+                candidates.append((link.text.strip(), link['href'].split('code=')[1]))
+        except: pass
     
-    card_html = f"""
-    <div class="stock-card">
-        <div class="stock-header">
-            <a href="{link}" target="_blank" class="stock-name">{s['name']}</a>
-            <span class="stock-price">{s['price']}</span>
+    random.shuffle(candidates)
+    results = []
+    
+    for name, code in candidates:
+        if len(results) >= 4: break
+        try:
+            url = f"https://query2.finance.yahoo.com/v8/finance/chart/{code}.KS?interval=1d&range=1y"
+            res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=3)
+            data = res.json()
+            closes = data['chart']['result'][0]['indicators']['quote'][0]['close']
+            closes = [c for c in closes if c is not None]
+            
+            if len(closes) < 20: continue
+            
+            curr_price = closes[-1]
+            high_52w = max(closes)
+            low_52w = min(closes)
+            mid_52w = (high_52w + low_52w) / 2
+            
+            ma5 = sum(closes[-5:]) / 5
+            ma20 = sum(closes[-20:]) / 20
+            
+            if curr_price <= mid_52w and ma5 >= ma20:
+                results.append({
+                    "name": name, "code": code,
+                    "price": f"{int(curr_price):,}원",
+                    "high": f"{int(high_52w):,}", "low": f"{int(low_52w):,}",
+                    "ma5": f"{int(ma5):,}", "ma20": f"{int(ma20):,}"
+                })
+        except: continue
+    return results
+
+with st.spinner("AI가 바닥을 다지고 상승하는 종목을 찾고 있습니다..."):
+    bottom_stocks = get_bottom_fishing_stocks()
+
+if not bottom_stocks:
+    st.markdown("<div class='stock-card' style='text-align:center; color:#94a3b8;'>현재 조건에 완벽히 부합하는 종목이 없습니다.</div>", unsafe_allow_html=True)
+else:
+    for s in bottom_stocks:
+        link = f"https://finance.naver.com/item/main.naver?code={s['code']}"
+        card_html = f"""
+        <div class="stock-card" style="border-left: 4px solid #f43f5e;">
+            <div class="stock-header">
+                <a href="{link}" target="_blank" class="stock-name">{s['name']}</a>
+                <span class="stock-price" style="color: #f43f5e;">{s['price']}</span>
+            </div>
+            <div class="stock-info-row">
+                <span class="info-label">52주 최고 / 최저</span> 
+                <span class="info-val">{s['high']} / {s['low']}</span>
+            </div>
+            <div class="stock-info-row">
+                <span class="info-label">5일선 / 20일선 (정배열)</span> 
+                <span class="info-val" style="color: #22c55e;">{s['ma5']} / {s['ma20']}</span>
+            </div>
         </div>
-        <div class="stock-info-row">
-            <span class="info-label">PBR</span> <span class="info-val">{pbr_styled}</span>
-        </div>
-        <div class="stock-info-row">
-            <span class="info-label">ROE</span> <span class="info-val">{s['roe']}</span>
-        </div>
-        <div class="stock-info-row">
-            <span class="info-label">부채비율 / 유보율</span> <span class="info-val">{s['debt']} / {s['reserve']}</span>
-        </div>
-        <div class="stock-trend-box">
-            <div class="trend-text">📈 최근 3년 매출액 추이</div>
-            <div class="trend-val" style="color: #94a3b8; margin-bottom: 8px;">{s['rev']}</div>
-            <div class="trend-text">🔥 최근 3년 영업이익 추이</div>
-            <div class="trend-val">{s['op']}</div>
-        </div>
-    </div>
-    """
-    st.markdown(card_html, unsafe_allow_html=True)
+        """
+        st.markdown(card_html, unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# ==========================================
+# [섹션 5] 실시간 기업 공시 전광판 (한글 깨짐 방지)
+# ==========================================
+st.markdown("<h4 style='color: #00f2fe; margin-bottom: 5px; font-weight: 800;'>📢 실시간 기업 공시</h4>", unsafe_allow_html=True)
+st.markdown("<p style='color: #94a3b8; font-size: 13px; margin-bottom: 15px;'>※ 스크롤을 내려 최신 공시를 확인하세요.</p>", unsafe_allow_html=True)
+
+def get_realtime_disclosures():
+    try:
+        url = "https://finance.naver.com/news/news_list.naver?mode=LSS3D&section_id=101&section_id2=258&section_id3=401"
+        res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+        res.encoding = 'euc-kr' # 한글 깨짐 완벽 방지
+        soup = BeautifulSoup(res.text, 'html.parser')
+        items = soup.select('.newsList li')
+        
+        html = "<div class='disclosure-box'>"
+        for item in items[:25]:
+            dt_tag = item.select_one('.articleSubject a')
+            if not dt_tag: continue
+            
+            title = dt_tag.text.strip()
+            link = "https://finance.naver.com" + dt_tag['href']
+            
+            date_tag = item.select_one('.wdate')
+            date_str = date_tag.text.strip() if date_tag else "방금 전"
+            
+            html += f"""
+            <div class="disclosure-item">
+                <div class="disclosure-time">🔔 {date_str}</div>
+                <a href="{link}" target="_blank" class="disclosure-title">{title}</a>
+            </div>
+            """
+        html += "</div>"
+        return html
+    except:
+        return "<div class='disclosure-box' style='text-align:center; color:#94a3b8; padding: 20px;'>공시 데이터를 불러올 수 없습니다.</div>"
+
+st.markdown(get_realtime_disclosures(), unsafe_allow_html=True)
 
 # ==========================================
 # [푸터] 투자 면책 조항
