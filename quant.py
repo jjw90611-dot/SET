@@ -296,7 +296,7 @@ with c8: st.markdown(make_card("비트코인 (BTC)", btc_p, btc_d, btc_pct, btc_
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ==========================================
-# [섹션 3] AI 기반 중소형 성장주 (속도 대폭 개선)
+# [섹션 3] AI 기반 중소형 성장주 (초고속 로딩 적용)
 # ==========================================
 st.markdown("<h4 style='color: #00f2fe; margin-bottom: 5px; font-weight: 800;'>💎 오늘의 저평가 중소형 성장주</h4>", unsafe_allow_html=True)
 st.markdown("<p style='color: #94a3b8; font-size: 13px; margin-bottom: 15px;'>※ 3년 연속 영업이익 증가, PBR 2.0 이하 등</p>", unsafe_allow_html=True)
@@ -307,8 +307,8 @@ def get_target_stock_codes():
     random.seed(today.toordinal())
     candidates = []
     
-    # 탐색 범위를 2~4페이지로 줄여 속도 대폭 향상
-    for page in range(2, 5):
+    # 탐색 범위를 1~3페이지로 줄여 속도 극대화
+    for page in range(1, 4):
         try:
             url = f"https://finance.naver.com/sise/sise_market_sum.naver?sosok=0&page={page}"
             res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
@@ -325,7 +325,7 @@ def get_target_stock_codes():
     results = []
     
     for name, code in candidates:
-        # 3개만 찾으면 즉시 탐색 종료 (로딩 시간 획기적 단축)
+        # 3개만 찾으면 즉시 탐색 종료 (정렬 과정 생략으로 로딩 시간 획기적 단축)
         if len(results) >= 3: break 
         
         try:
@@ -351,7 +351,7 @@ def get_target_stock_codes():
             if float(debt_str) > 200: continue
             
             reserve_str = rows[8].find_all('td')[2].text.strip().replace(',', '')
-            reserve_val = float(reserve_str) if reserve_str and reserve_str != '-' else 0
+            reserve = reserve_str + "%" if reserve_str and reserve_str != '-' else "확인불가"
             
             op_cols = rows[1].find_all('td')[:3]
             ops = [int(c.text.strip().replace(',', '')) for c in op_cols if c.text.strip() and c.text.strip() != '-']
@@ -362,21 +362,19 @@ def get_target_stock_codes():
                 if ops[0] > 0 and ops[0] < ops[1] < ops[2]:
                     roe = rows[5].find_all('td')[2].text.strip() + "%"
                     debt = rows[6].find_all('td')[2].text.strip() + "%"
-                    reserve = rows[8].find_all('td')[2].text.strip() + "%"
                     rev_str = f"{revs[0]:,} ➔ {revs[1]:,} ➔ {revs[2]:,}억"
                     op_str = f"{ops[0]:,} ➔ {ops[1]:,} ➔ {ops[2]:,}억"
                     
                     results.append({
                         "name": name, "code": code, "price": curr_price, "pbr": str(pbr),
-                        "roe": roe, "debt": debt, "reserve": reserve, "reserve_val": reserve_val,
+                        "roe": roe, "debt": debt, "reserve": reserve,
                         "rev": rev_str, "op": op_str
                     })
         except: continue
         
-    results.sort(key=lambda x: x['reserve_val'], reverse=True)
     return results
 
-with st.spinner("AI가 오늘의 성장 기업을 발굴하고 있습니다... (속도 최적화 적용)"):
+with st.spinner("AI가 오늘의 성장 기업을 발굴하고 있습니다... (초고속 탐색 중)"):
     final_stock_data = get_target_stock_codes()
 
 if not final_stock_data:
@@ -493,21 +491,20 @@ else:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ==========================================
-# [섹션 5] 실시간 기업 공시 전광판 (Iframe 격리로 에러 원천 차단)
+# [섹션 5] 실시간 기업 공시 전광판 (내장 파서 사용으로 에러 완벽 해결)
 # ==========================================
 st.markdown("<h4 style='color: #00f2fe; margin-bottom: 5px; font-weight: 800;'>📢 실시간 기업 공시 (DART)</h4>", unsafe_allow_html=True)
 st.markdown("<p style='color: #94a3b8; font-size: 13px; margin-bottom: 15px;'>※ 금융감독원 전자공시시스템 실시간 연동 (스크롤하여 확인)</p>", unsafe_allow_html=True)
 
 def get_dart_disclosures_html():
-    """마크다운 충돌을 막기 위해 완전한 HTML 문서를 생성하여 Iframe으로 렌더링"""
     try:
         url = "https://dart.fss.or.kr/api/todayRSS.xml"
         res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
         res.encoding = 'utf-8'
         
-        # xml 파서 사용으로 특수문자 파싱 에러 방지
-        soup = BeautifulSoup(res.text, 'xml')
-        items = soup.find_all('item')
+        # 외부 라이브러리(lxml) 없이 파이썬 기본 내장 모듈(ET) 사용 -> 에러 원천 차단
+        root = ET.fromstring(res.text)
+        items = root.findall('.//item')
         
         html_content = """
         <!DOCTYPE html>
@@ -544,10 +541,10 @@ def get_dart_disclosures_html():
                 author_elem = item.find('author')
                 pub_date_elem = item.find('pubDate')
                 
-                title = title_elem.text.strip() if title_elem else "제목 없음"
-                link = link_elem.text.strip() if link_elem else "#"
-                author = author_elem.text.strip() if author_elem else ""
-                pub_date_str = pub_date_elem.text.strip() if pub_date_elem else ""
+                title = title_elem.text.strip() if title_elem is not None else "제목 없음"
+                link = link_elem.text.strip() if link_elem is not None else "#"
+                author = author_elem.text.strip() if author_elem is not None else ""
+                pub_date_str = pub_date_elem.text.strip() if pub_date_elem is not None else ""
                 
                 try: 
                     dt = parsedate_to_datetime(pub_date_str)
@@ -569,7 +566,7 @@ def get_dart_disclosures_html():
     except Exception as e:
         return "<html><body style='background:transparent;'><div style='text-align:center; color:#94a3b8; padding: 20px;'>공시 데이터를 불러올 수 없습니다.</div></body></html>"
 
-# Streamlit의 마크다운 파서를 거치지 않고 독립된 Iframe으로 렌더링 (에러 원천 차단)
+# Streamlit의 마크다운 파서를 거치지 않고 독립된 Iframe으로 렌더링
 components.html(get_dart_disclosures_html(), height=420, scrolling=False)
 
 # ==========================================
