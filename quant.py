@@ -9,7 +9,7 @@ import ssl
 import xml.etree.ElementTree as ET
 from email.utils import parsedate_to_datetime
 
-# 보안(SSL) 차단 무시 (공공 와이파이/사내망 에러 방지)
+# 보안(SSL) 차단 무시
 if hasattr(ssl, '_create_unverified_context'):
     ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -289,7 +289,7 @@ with c8: st.markdown(make_card("비트코인 (BTC)", btc_p, btc_d, btc_pct, btc_
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ==========================================
-# [섹션 3] AI 기반 중소형 성장주 (속도 최적화)
+# [섹션 3] AI 기반 중소형 성장주
 # ==========================================
 st.markdown("<h4 style='color: #00f2fe; margin-bottom: 5px; font-weight: 800;'>💎 오늘의 저평가 중소형 성장주</h4>", unsafe_allow_html=True)
 st.markdown("<p style='color: #94a3b8; font-size: 13px; margin-bottom: 15px;'>※ 3년 연속 영업이익 증가 & PBR 2.0 이하</p>", unsafe_allow_html=True)
@@ -322,7 +322,6 @@ def get_target_stock_codes():
             res.encoding = 'euc-kr'
             soup = BeautifulSoup(res.text, 'html.parser')
             
-            # 실시간 가격 네이버에서 바로 추출 (속도 향상)
             price_tag = soup.select_one('.no_today .blind')
             curr_price = price_tag.text.strip() + "원" if price_tag else "확인불가"
             
@@ -394,15 +393,15 @@ else:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ==========================================
-# [섹션 4] 저점 주식 공략 (52주 중간값 이하 & 5일선>20일선 정배열)
+# [섹션 4] 저점 주식 공략 (비밀 조건 적용, 최대 10개)
 # ==========================================
-st.markdown("<h4 style='color: #f43f5e; margin-bottom: 5px; font-weight: 800;'>🎯 오늘의 바닥 탈출 (저점 공략주)</h4>", unsafe_allow_html=True)
-st.markdown("<p style='color: #94a3b8; font-size: 13px; margin-bottom: 15px;'>※ 현재가가 52주 최고/최저 중간값 이하이면서, 5일선이 20일선을 돌파한 정배열 종목</p>", unsafe_allow_html=True)
+st.markdown("<h4 style='color: #f43f5e; margin-bottom: 15px; font-weight: 800;'>🎯 오늘의 바닥 탈출 (저점 공략주)</h4>", unsafe_allow_html=True)
 
 @st.cache_data(ttl=3600)
 def get_bottom_fishing_stocks():
     candidates = []
-    for page in range(1, 4):
+    # 탐색 범위를 넓혀서 더 많은 종목을 찾도록 수정 (1~6페이지)
+    for page in range(1, 6):
         try:
             url = f"https://finance.naver.com/sise/sise_market_sum.naver?sosok=0&page={page}"
             res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
@@ -417,7 +416,7 @@ def get_bottom_fishing_stocks():
     results = []
     
     for name, code in candidates:
-        if len(results) >= 4: break
+        if len(results) >= 10: break # 최대 10개까지 발굴
         try:
             url = f"https://query2.finance.yahoo.com/v8/finance/chart/{code}.KS?interval=1d&range=1y"
             res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=3)
@@ -435,6 +434,7 @@ def get_bottom_fishing_stocks():
             ma5 = sum(closes[-5:]) / 5
             ma20 = sum(closes[-20:]) / 20
             
+            # 비밀 조건: 52주 중간값 이하 & 5일선이 20일선 돌파
             if curr_price <= mid_52w and ma5 >= ma20:
                 results.append({
                     "name": name, "code": code,
@@ -464,7 +464,7 @@ else:
                 <span class="info-val">{s['high']} / {s['low']}</span>
             </div>
             <div class="stock-info-row">
-                <span class="info-label">5일선 / 20일선 (정배열)</span> 
+                <span class="info-label">5일선 / 20일선</span> 
                 <span class="info-val" style="color: #22c55e;">{s['ma5']} / {s['ma20']}</span>
             </div>
         </div>
@@ -474,42 +474,56 @@ else:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ==========================================
-# [섹션 5] 실시간 기업 공시 전광판 (한글 깨짐 방지)
+# [섹션 5] 실시간 기업 공시 전광판 (DART 연동)
 # ==========================================
-st.markdown("<h4 style='color: #00f2fe; margin-bottom: 5px; font-weight: 800;'>📢 실시간 기업 공시</h4>", unsafe_allow_html=True)
-st.markdown("<p style='color: #94a3b8; font-size: 13px; margin-bottom: 15px;'>※ 스크롤을 내려 최신 공시를 확인하세요.</p>", unsafe_allow_html=True)
+st.markdown("<h4 style='color: #00f2fe; margin-bottom: 5px; font-weight: 800;'>📢 실시간 기업 공시 (DART)</h4>", unsafe_allow_html=True)
+st.markdown("<p style='color: #94a3b8; font-size: 13px; margin-bottom: 15px;'>※ 금융감독원 전자공시시스템 실시간 연동</p>", unsafe_allow_html=True)
 
-def get_realtime_disclosures():
+def get_dart_disclosures():
     try:
-        url = "https://finance.naver.com/news/news_list.naver?mode=LSS3D&section_id=101&section_id2=258&section_id3=401"
+        # DART 공식 RSS 피드 활용
+        url = "https://dart.fss.or.kr/api/todayRSS.xml"
         res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
-        res.encoding = 'euc-kr' # 한글 깨짐 완벽 방지
-        soup = BeautifulSoup(res.text, 'html.parser')
-        items = soup.select('.newsList li')
+        res.encoding = 'utf-8'
+        root = ET.fromstring(res.text)
         
         html = "<div class='disclosure-box'>"
-        for item in items[:25]:
-            dt_tag = item.select_one('.articleSubject a')
-            if not dt_tag: continue
+        items = root.findall('.//item')
+        
+        if not items:
+            return "<div class='disclosure-box' style='text-align:center; color:#94a3b8; padding: 20px;'>현재 업데이트된 공시가 없습니다.</div>"
             
-            title = dt_tag.text.strip()
-            link = "https://finance.naver.com" + dt_tag['href']
+        for item in items[:30]: # 최신 30개 공시
+            title_elem = item.find('title')
+            link_elem = item.find('link')
+            author_elem = item.find('author')
+            pub_date_elem = item.find('pubDate')
             
-            date_tag = item.select_one('.wdate')
-            date_str = date_tag.text.strip() if date_tag else "방금 전"
+            title = title_elem.text if title_elem is not None else "제목 없음"
+            link = link_elem.text if link_elem is not None else "#"
+            author = author_elem.text if author_elem is not None else ""
+            pub_date_str = pub_date_elem.text if pub_date_elem is not None else ""
+            
+            try: 
+                dt = parsedate_to_datetime(pub_date_str)
+                date_str = dt.strftime("%H:%M")
+            except: 
+                date_str = "방금 전"
+                
+            display_title = f"[{author}] {title}" if author else title
             
             html += f"""
             <div class="disclosure-item">
                 <div class="disclosure-time">🔔 {date_str}</div>
-                <a href="{link}" target="_blank" class="disclosure-title">{title}</a>
+                <a href="{link}" target="_blank" class="disclosure-title">{display_title}</a>
             </div>
             """
         html += "</div>"
         return html
-    except:
-        return "<div class='disclosure-box' style='text-align:center; color:#94a3b8; padding: 20px;'>공시 데이터를 불러올 수 없습니다.</div>"
+    except Exception as e:
+        return "<div class='disclosure-box' style='text-align:center; color:#94a3b8; padding: 20px;'>공시 데이터를 불러올 수 없습니다. (DART 서버 응답 지연)</div>"
 
-st.markdown(get_realtime_disclosures(), unsafe_allow_html=True)
+st.markdown(get_dart_disclosures(), unsafe_allow_html=True)
 
 # ==========================================
 # [푸터] 투자 면책 조항
