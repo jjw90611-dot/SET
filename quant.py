@@ -111,7 +111,7 @@ st.markdown("""
 # ==========================================
 # [헤더] 타이틀 & 새로고침 버튼 & 실시간 시계
 # ==========================================
-st.markdown("<div class='main-title'>조선생의 SET(Stock ETF Trader)</div>", unsafe_allow_html=True)
+st.markdown("<div class='main-title'>조선생의 <br>SET(Stock ETF Trader)</div>", unsafe_allow_html=True)
 st.markdown("<div class='sub-title'>⚡ 글로벌 실시간 증시 · 환율 · 유가 · AI 성장주 발굴</div>", unsafe_allow_html=True)
 
 col_btn, col_clock = st.columns([1, 2])
